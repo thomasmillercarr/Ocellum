@@ -1,0 +1,101 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Placeholder pet: a drawn-in-code ball (M0). Replaced by canvas renderer at M1. */
+#pet {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #7ec8e3, #2a6f8f 70%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+#pet::before,
+#pet::after {
+  content: "";
+  position: absolute;
+  top: 34px;
+  width: 10px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0d2530;
+}
+
+#pet::before {
+  left: 30px;
+}
+
+#pet::after {
+  right: 30px;
+}
+
+#bubble {
+  position: absolute;
+  right: 24px;
+  bottom: 136px;
+  width: 320px;
+  min-height: 160px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#bubble[hidden] {
+  display: none;
+}
+
+#bubble-close {
+  align-self: flex-end;
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #666;
+  line-height: 1;
+}
+
+#bubble-body {
+  flex: 1;
+  font-size: 13px;
+  color: #333;
+  overflow-y: auto;
+}
+
+#bubble-input {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+#bubble-input:focus {
+  border-color: #2a6f8f;
+}
