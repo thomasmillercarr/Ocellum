@@ -1,5 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { placeholderCharacter } from "./character";
+import { BlinkMachine, rollTransform } from "./behaviour";
+import { renderFrame } from "./renderer";
 
 const pet = document.getElementById("pet") as HTMLDivElement;
 const bubble = document.getElementById("bubble") as HTMLDivElement;
@@ -52,3 +55,25 @@ void listen("close-bubble", () => void setBubbleOpen(false));
 window.addEventListener("resize", () => void reportHitRegions());
 
 void reportHitRegions();
+
+async function startCharacter() {
+  const character = await placeholderCharacter();
+  const canvas = document.getElementById("pet-canvas") as HTMLCanvasElement;
+  canvas.width = character.width;
+  canvas.height = character.height;
+  const ctx = canvas.getContext("2d")!;
+  const blink = new BlinkMachine();
+  // ponytail: radius convention is 0.375·canvas width (matches the
+  // placeholder's 72px ball on a 192px canvas); make it a manifest field if
+  // a real character ever needs a different pivot.
+  const radius = character.width * 0.375;
+  const t0 = performance.now();
+  const frame = (now: number) => {
+    const t = now - t0;
+    renderFrame(ctx, character, blink.at(t), rollTransform(t, radius));
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
+void startCharacter();

@@ -5,7 +5,7 @@
 | Milestone | Status | Gate result |
 |---|---|---|
 | M0 — Windows spike | **PASSED** 2026-07-16 | `scripts/gate-m0.ps1` exit 0 — all 13 automated checks pass |
-| M1 — Signs of life | not started | — |
+| M1 — Signs of life | **PASSED** 2026-07-16 | `scripts/gate-m1.ps1` exit 0 — 21 TS + 2 Rust tests, live render check |
 | M2 — A brain | not started | — |
 | M3 — The loop | not started | — |
 
@@ -29,6 +29,24 @@
       modes, or check manually. ScaleFactorChanged handler repositions the
       window on DPI/display changes.
 - [ ] M3: cold start → first draft timing (record here)
+
+## M1 gate result (2026-07-16)
+
+- Blink machine emits open→half(40)→closed(60)→half(40)→open; double-blink
+  chains a second sequence after 90ms of open.
+- 1000 simulated seconds (seeded RNG): gap mean 4.07s expected for the
+  800ms-clamped exponential, within ±10% of 4s; min gap ≥ 800ms; CV in
+  [0.7, 1.1] (shape check).
+- Blink onsets vs roll phase: mean resultant length R < 0.15 (uniform).
+- Roll transform: ±10° / ±6px / 1.03-0.97 squash / pivot 0.4·radius verified
+  at t = 0, T/4, 3T/4. Shadow 0.5× translate, 0.9→1.1 scaleX, 0.25→0.15 alpha.
+- Contract loader rejects mismatched canvas dims + missing required layers
+  with clear errors (IHDR-level, before decode).
+- Renderer: all layers drawn at (0,0); shadow→body→eyes order; optional
+  layers degrade gracefully.
+- Placeholder: all layers are data: SVG URLs — zero external assets.
+- Live check: release exe launched, screen pixels at pet centre are the
+  ball's blue (1465/1600) — the canvas really composites on the desktop.
 
 ## M0 gate result (2026-07-16)
 

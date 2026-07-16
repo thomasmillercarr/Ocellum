@@ -48,6 +48,51 @@ unsafe fn SetForegroundWindow(_hwnd: isize) -> i32 {
     0
 }
 
+/// Layer filenames of the character asset contract (§8.2). Fixed set —
+/// discovery is "which of these exist in the directory".
+const LAYER_NAMES: [&str; 11] = [
+    "body",
+    "shadow",
+    "eyes_open",
+    "eyes_half",
+    "eyes_closed",
+    "mouth_closed",
+    "mouth_open",
+    "brows_neutral",
+    "brows_happy",
+    "brows_restless",
+    "brows_flat",
+];
+
+#[derive(Serialize, Debug)]
+pub struct CharacterDirData {
+    pub manifest: String,
+    /// layer name -> base64 PNG bytes. Validation happens in the frontend
+    /// loader (registration check on IHDR before decode).
+    pub layers: std::collections::HashMap<String, String>,
+}
+
+#[tauri::command]
+fn read_character_dir(path: String) -> Result<CharacterDirData, String> {
+    use base64::Engine;
+    let dir = std::path::Path::new(&path);
+    let manifest = std::fs::read_to_string(dir.join("character.json"))
+        .map_err(|e| format!("cannot read character.json in {path}: {e}"))?;
+    let mut layers = std::collections::HashMap::new();
+    for name in LAYER_NAMES {
+        let file = dir.join(format!("{name}.png"));
+        if file.exists() {
+            let bytes =
+                std::fs::read(&file).map_err(|e| format!("cannot read {name}.png: {e}"))?;
+            layers.insert(
+                name.to_string(),
+                base64::engine::general_purpose::STANDARD.encode(bytes),
+            );
+        }
+    }
+    Ok(CharacterDirData { manifest, layers })
+}
+
 #[tauri::command]
 fn set_hit_regions(state: tauri::State<AppState>, rects: Vec<Rect>) {
     state.0.lock().unwrap().rects = rects;
@@ -206,7 +251,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             set_hit_regions,
             report_input,
-            bubble_state
+            bubble_state,
+            read_character_dir
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").expect("main window");
@@ -266,4 +312,32 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Ocellum");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn read_character_dir_reads_manifest_and_existing_layers() {
+        let dir = std::env::temp_dir().join(format!("ocellum-chardir-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("character.json"), r#"{"name":"t"}"#).unwrap();
+        std::fs::write(dir.join("body.png"), [1u8, 2, 3]).unwrap();
+        std::fs::write(dir.join("eyes_open.png"), [4u8, 5]).unwrap();
+        std::fs::write(dir.join("unrelated.txt"), "x").unwrap();
+        let data = super::read_character_dir(dir.to_string_lossy().into()).unwrap();
+        assert_eq!(data.manifest, r#"{"name":"t"}"#);
+        assert_eq!(data.layers.len(), 2);
+        assert!(data.layers.contains_key("body"));
+        assert!(data.layers.contains_key("eyes_open"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn read_character_dir_without_manifest_errors_clearly() {
+        let dir = std::env::temp_dir().join(format!("ocellum-nomanifest-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let err = super::read_character_dir(dir.to_string_lossy().into()).unwrap_err();
+        assert!(err.contains("character.json"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

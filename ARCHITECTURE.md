@@ -72,7 +72,24 @@ Pattern (standard for Tauri overlays):
 
 ## Interfaces (owned, never delegated)
 
-- TBD as milestones land.
+### M1 — character & behaviour
+
+- `src/character.ts` — asset contract. `Character { name, width, height,
+  layers: Partial<Record<LayerName, CanvasImageSource>> }`. Loaders:
+  `characterFromBytes(manifestJson, layerBytes)` (validates via PNG IHDR
+  before decode) and `placeholderCharacter()` (inline SVG data URLs, zero
+  files). `validateLayerDimensions` refuses mis-registered characters.
+- `src/behaviour.ts` — pure engine. `BlinkMachine(rng).at(tMs): EyeState`
+  (Poisson gaps mean 4s clamped ≥800ms; double-blink = one event, 15%);
+  `rollTransform(tMs, radius)` returns rotation/translate/squash/pivot +
+  shadow params. Roll and blink share no state — independence is a tested
+  invariant, don't "refactor" them onto one timer.
+- `src/renderer.ts` — `renderFrame(ctx, character, eyes, roll, extraLayers)`.
+  Draws every layer at (0,0); transforms are whole-canvas. `Ctx2d` interface
+  exists so tests inject a recorder.
+- Rust `read_character_dir(path)` — IO only (manifest string + base64 layer
+  map); validation stays in the TS loader.
+- Radius convention: 0.375·canvas width (placeholder's 72px on 192px).
 
 ## Trade log
 

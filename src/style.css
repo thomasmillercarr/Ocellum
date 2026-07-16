@@ -20,36 +20,20 @@ body {
   height: 100%;
 }
 
-/* Placeholder pet: a drawn-in-code ball (M0). Replaced by canvas renderer at M1. */
+/* The pet: a canvas composited by the character renderer. */
 #pet {
   position: absolute;
   right: 24px;
   bottom: 24px;
   width: 96px;
   height: 96px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #7ec8e3, #2a6f8f 70%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 
-#pet::before,
-#pet::after {
-  content: "";
-  position: absolute;
-  top: 34px;
-  width: 10px;
-  height: 14px;
-  border-radius: 50%;
-  background: #0d2530;
-}
-
-#pet::before {
-  left: 30px;
-}
-
-#pet::after {
-  right: 30px;
+#pet canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 #bubble {
