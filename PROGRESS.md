@@ -6,7 +6,7 @@
 |---|---|---|
 | M0 — Windows spike | **PASSED** 2026-07-16 | `scripts/gate-m0.ps1` exit 0 — all 13 automated checks pass |
 | M1 — Signs of life | **PASSED** 2026-07-16 | `scripts/gate-m1.ps1` exit 0 — 21 TS + 2 Rust tests, live render check |
-| M2 — A brain | not started | — |
+| M2 — A brain | **PASSED** 2026-07-16 | `scripts/gate-m2.ps1` exit 0 — 13 unit + 2 real-integration tests + live-UI E2E |
 | M3 — The loop | not started | — |
 
 ## Log
@@ -29,6 +29,26 @@
       modes, or check manually. ScaleFactorChanged handler repositions the
       window on DPI/display changes.
 - [ ] M3: cold start → first draft timing (record here)
+
+## M2 gate result (2026-07-16)
+
+- One interface: identical ChatRequest streamed through Anthropic, OpenAI and
+  Ollama providers against protocol-accurate mock servers; text, deltas, and
+  usage all asserted.
+- Claude Code: real call through the user's authenticated CLI (pong test,
+  usage > 0); `--disallowedTools` + `--tools ""` + `--max-turns 1` asserted on
+  the pure arg builder; binary detected at C:\Users\Tom Miller\.local\bin\claude.exe.
+- Keychain: roundtrip against the real Windows Credential Manager (service
+  `ocellum-test`); after an E2E run with a planted distinctive key, a scan of
+  every file written during the run (project tree, DB, appdata) found zero
+  occurrences.
+- Cost: 100k in + 50k out on opus-4-8 at 0.79 GBP/USD = 138.25p exactly.
+- Spend cap: on by default (cap_enabled=1, £5); unit test proves the third
+  call is refused once the ledger crosses the cap, with egress parity 2=2.
+- Claude Code budget: serialized shape is exactly {mode, calls, tokens_in,
+  tokens_out, note} — own usage only, no remaining-limit field exists.
+- Live E2E: release exe + mock SSE server; typed "ping" into the real bubble,
+  streamed response rendered, chat-log verified, 2 calls → 2 egress rows.
 
 ## M1 gate result (2026-07-16)
 

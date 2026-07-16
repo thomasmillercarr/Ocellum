@@ -1,3 +1,8 @@
+mod chat;
+mod db;
+mod prompt;
+mod providers;
+
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::sync::Mutex;
@@ -221,6 +226,47 @@ fn spawn_test_control(app: AppHandle) {
                     let _ = app.emit("close-bubble", ());
                     serde_json::json!({ "ok": true })
                 }
+                "chat-log" => {
+                    let chat_state = app.state::<chat::ChatState>();
+                    let last = chat_state.last_response.lock().unwrap().clone();
+                    serde_json::json!({ "last": last })
+                }
+                "egress-count" => {
+                    let dbs = app.state::<chat::DbState>();
+                    let n = db::egress_count(&dbs.0.lock().unwrap());
+                    serde_json::json!({ "count": n })
+                }
+                cmd if cmd.starts_with("set-setting ") => {
+                    let rest = &cmd["set-setting ".len()..];
+                    match rest.split_once(' ') {
+                        Some((key, value)) => {
+                            let dbs = app.state::<chat::DbState>();
+                            let conn = dbs.0.lock().unwrap();
+                            match db::setting_set(&conn, key, value) {
+                                Ok(()) => serde_json::json!({ "ok": true }),
+                                Err(e) => serde_json::json!({ "error": e.to_string() }),
+                            }
+                        }
+                        None => serde_json::json!({ "error": "usage: set-setting <key> <value>" }),
+                    }
+                }
+                cmd if cmd.starts_with("delete-key ") => {
+                    let provider = cmd["delete-key ".len()..].trim();
+                    match chat::remove_key(provider) {
+                        Ok(()) => serde_json::json!({ "ok": true }),
+                        Err(e) => serde_json::json!({ "error": e }),
+                    }
+                }
+                cmd if cmd.starts_with("set-key ") => {
+                    let rest = &cmd["set-key ".len()..];
+                    match rest.split_once(' ') {
+                        Some((provider, key)) => match chat::store_key(provider, key) {
+                            Ok(()) => serde_json::json!({ "ok": true }),
+                            Err(e) => serde_json::json!({ "error": e }),
+                        },
+                        None => serde_json::json!({ "error": "usage: set-key <provider> <key>" }),
+                    }
+                }
                 other => serde_json::json!({ "error": format!("unknown command: {other}") }),
             };
             let _ = writeln!(stream, "{reply}");
@@ -248,13 +294,33 @@ fn position_bottom_right(window: &WebviewWindow) {
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState(Mutex::new(Shared::default())))
+        .manage(chat::ChatState::default())
         .invoke_handler(tauri::generate_handler![
             set_hit_regions,
             report_input,
             bubble_state,
-            read_character_dir
+            read_character_dir,
+            chat::get_settings,
+            chat::set_setting,
+            chat::set_api_key,
+            chat::delete_api_key,
+            chat::get_budget,
+            chat::get_egress_log,
+            chat::chat_send
         ])
         .setup(|app| {
+            // Local store: OCELLUM_DB_PATH overrides for tests.
+            let db_path = match std::env::var("OCELLUM_DB_PATH") {
+                Ok(p) => std::path::PathBuf::from(p),
+                Err(_) => {
+                    let dir = app.path().app_data_dir().expect("app data dir");
+                    std::fs::create_dir_all(&dir)?;
+                    dir.join("ocellum.db")
+                }
+            };
+            let conn = db::open(&db_path)?;
+            app.manage(chat::DbState(Mutex::new(conn)));
+
             let window = app.get_webview_window("main").expect("main window");
 
             #[cfg(windows)]

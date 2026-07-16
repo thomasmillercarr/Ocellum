@@ -91,6 +91,37 @@ Pattern (standard for Tauri overlays):
   map); validation stays in the TS loader.
 - Radius convention: 0.375·canvas width (placeholder's 72px on 192px).
 
+### M2 — model layer
+
+- `providers.rs` — `trait Provider { name, destination, model, stream(req, on_delta) -> ChatOutcome }`.
+  Impls: Anthropic (SSE /v1/messages), OpenAI (SSE /v1/chat/completions,
+  stream_options.include_usage), Ollama (JSON lines /api/chat), ClaudeCode
+  (shell-out, stream-json). All base_urls injectable → gate tests run the full
+  path against mock servers. Blocking reqwest on a worker thread — no async
+  plumbing needed at this call volume.
+- Claude Code lockdown: `--tools ""` disables the built-in set AND
+  `--disallowedTools <list>` (belt and braces), `--max-turns 1`,
+  `--no-session-persistence`. `build_claude_args` is pure and gate-asserted.
+- `chat.rs::run_chat` — THE chokepoint. Order: spend-cap check → egress row
+  (at send time; failed calls still egressed) → provider.stream → model_call
+  cost row. Every model call goes through it; M3+ features must call it, not
+  providers directly.
+- `db.rs` — brief §7 schema verbatim (interaction.kind CHECK-constrained to
+  the closed enum) + internal `setting` (never credentials) + `model_call`
+  (cost ledger; interaction is lead-bound, budget must also meter lead-less
+  calls). DB path: app_data_dir/ocellum.db, OCELLUM_DB_PATH override in tests.
+- Keychain: `keyring` crate v4 → Windows Credential Manager, service
+  "ocellum" ("ocellum-test" under OCELLUM_TEST). Keys never in DB/settings.
+- Budget: `BudgetSummary` tagged enum — ApiKey{month_pence, cap...},
+  ClaudeCode{calls, tokens in/out, note} (no remaining field, type-level),
+  Free{calls}. Cap default ON at 500 pence.
+- Prices: settings-stored JSON (editable), seeded 2026-07 (Anthropic from
+  docs, OpenAI from public trackers). GBP via fixed configurable fx (0.79
+  default) — no FX network calls (would be egress).
+- `prompt.rs::build_system_prompt(tools)` — runtime assembly, no hardcoded
+  tool list (§3); MCP (M5) feeds it.
+- Default provider anthropic / claude-opus-4-8; user-changeable in Settings.
+
 ## Trade log
 
 - (record capable-vs-light trades here)

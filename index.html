@@ -9,9 +9,56 @@
   <body>
     <div id="stage">
       <div id="bubble" hidden>
-        <button id="bubble-close" aria-label="Close">×</button>
-        <div id="bubble-body"></div>
-        <input id="bubble-input" type="text" placeholder="Talk to Ocellum…" autocomplete="off" />
+        <div id="bubble-head">
+          <nav id="bubble-tabs">
+            <button data-view="chat" class="active">Chat</button>
+            <button data-view="budget">Budget</button>
+            <button data-view="egress">Egress</button>
+            <button data-view="settings">Settings</button>
+          </nav>
+          <button id="bubble-close" aria-label="Close">×</button>
+        </div>
+        <div id="view-chat" class="view">
+          <div id="chat-log"></div>
+          <input id="bubble-input" type="text" placeholder="Talk to Ocellum…" autocomplete="off" />
+        </div>
+        <div id="view-budget" class="view" hidden></div>
+        <div id="view-egress" class="view" hidden></div>
+        <div id="view-settings" class="view" hidden>
+          <label>Provider
+            <select id="set-provider">
+              <option value="anthropic">Anthropic (API key)</option>
+              <option value="openai">OpenAI (API key)</option>
+              <option value="claude_code">Claude Code (your install)</option>
+              <option value="ollama">Ollama (local)</option>
+            </select>
+          </label>
+          <div data-for="anthropic">
+            <label>Anthropic model <input id="set-anthropic-model" /></label>
+            <label>API key <input id="set-anthropic-key" type="password" placeholder="sk-ant-…" /></label>
+            <div class="hint">Needs a console.anthropic.com account with billing —
+              a Claude Pro subscription does not include API access.</div>
+          </div>
+          <div data-for="openai" hidden>
+            <label>OpenAI model <input id="set-openai-model" /></label>
+            <label>API key <input id="set-openai-key" type="password" placeholder="sk-…" /></label>
+            <div class="hint">Needs a platform.openai.com account with billing —
+              ChatGPT Plus does not include API access.</div>
+          </div>
+          <div data-for="claude_code" hidden>
+            <div class="hint" id="claude-code-status"></div>
+            <div class="hint">Ocellum shells out to your own Claude Code install and shares
+              its rate limit. Heavy use may consume the window you need for other work.</div>
+          </div>
+          <div data-for="ollama" hidden>
+            <label>Ollama model <input id="set-ollama-model" /></label>
+            <label>Ollama URL <input id="set-ollama-url" /></label>
+            <div class="hint">No web search on Ollama — enrichment is unavailable.</div>
+          </div>
+          <label class="row"><input type="checkbox" id="set-cap-enabled" /> Monthly spend cap</label>
+          <label>Cap (£) <input id="set-cap-pounds" type="number" min="0" step="0.5" /></label>
+          <div id="settings-status" class="hint"></div>
+        </div>
       </div>
       <div id="pet" title="Ocellum"><canvas id="pet-canvas"></canvas></div>
     </div>
