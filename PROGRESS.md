@@ -7,7 +7,7 @@
 | M0 — Windows spike | **PASSED** 2026-07-16 | `scripts/gate-m0.ps1` exit 0 — all 13 automated checks pass |
 | M1 — Signs of life | **PASSED** 2026-07-16 | `scripts/gate-m1.ps1` exit 0 — 21 TS + 2 Rust tests, live render check |
 | M2 — A brain | **PASSED** 2026-07-16 | `scripts/gate-m2.ps1` exit 0 — 13 unit + 2 real-integration tests + live-UI E2E |
-| M3 — The loop | not started | — |
+| M3 — The loop | **PASSED** 2026-07-16 | `scripts/gate-m3.ps1` exit 0 — full loop E2E, 8.6s cold start → draft |
 
 ## Log
 
@@ -29,6 +29,31 @@
       modes, or check manually. ScaleFactorChanged handler repositions the
       window on DPI/display changes.
 - [ ] M3: cold start → first draft timing (record here)
+
+## M3 gate result (2026-07-16)
+
+- End-to-end (release exe, mock provider): raw text → lead row with parsed
+  name/email/company/domain → enrichment via the provider path → draft
+  produced, persisted as `interaction(kind='draft_email')`, and written to
+  the real Windows clipboard → reminder scheduled → reminder fired by the
+  scanner and surfaced with evidence.
+- Cold start → draft on clipboard: **8.6 s** (automated, mock provider,
+  scripted key entry). Well under the 3-minute bar; see manual checks for
+  the human-flow timing with real key entry.
+- Clipboard monitoring: `0` on a fresh DB, asserted through the running app.
+- Dismissals: trigger fired before, refused after exactly three dismissals;
+  other trigger types unaffected (unit).
+- Hard silence: suppresses surfaces while on, restores when lifted (live) —
+  also blocks every trigger type (unit). Tray has the toggle.
+- No mail path: zero SMTP/mail-API references in source, no mail crates in
+  Cargo.lock, and all egress rows during the E2E point at the mock host only.
+
+### Honesty notes
+- Enrichment E2E ran against the mock (no Anthropic/OpenAI API key exists on
+  this machine). The web-search tool wiring (`web_search_20260209`/`20250305`
+  by model) is unit-tested but has not run against a live API. First run with
+  a real key should verify it.
+- The 3-minute timing including *human* key entry needs a manual run.
 
 ## M2 gate result (2026-07-16)
 

@@ -27,7 +27,8 @@ pub const DEFAULT_PRICES_JSON: &str = r#"{
   "gpt-5.4-nano": {"in": 0.2, "out": 1.25}
 }"#;
 
-const SETTING_DEFAULTS: [(&str, &str); 13] = [
+const SETTING_DEFAULTS: [(&str, &str); 14] = [
+    ("hard_silence", "0"),
     ("provider", "anthropic"),
     ("anthropic_model", "claude-opus-4-8"),
     ("openai_model", "gpt-5.4"),
@@ -276,7 +277,8 @@ pub fn budget_summary(conn: &Connection) -> BudgetSummary {
 // Tauri commands
 // ---------------------------------------------------------------------------
 
-const SETTABLE_KEYS: [&str; 13] = [
+const SETTABLE_KEYS: [&str; 14] = [
+    "hard_silence",
     "provider",
     "anthropic_model",
     "openai_model",

@@ -194,6 +194,95 @@ table.egress td {
   background: #2a6f8f;
 }
 
+#monitor-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e05555;
+  border: 2px solid #fff;
+}
+
+#capture-text {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: none;
+}
+
+button.action {
+  border: none;
+  border-radius: 6px;
+  background: #2a6f8f;
+  color: #fff;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+button.action:disabled {
+  opacity: 0.5;
+}
+
+.lead {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lead .who {
+  font-weight: 600;
+}
+
+.lead .sub {
+  font-size: 11px;
+  color: #888;
+}
+
+.lead .actions {
+  display: flex;
+  gap: 6px;
+}
+
+.lead .actions button {
+  border: 1px solid #2a6f8f;
+  border-radius: 6px;
+  background: #fff;
+  color: #2a6f8f;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.notice {
+  background: #fff8e6;
+  border: 1px solid #f0dfae;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notice .dismiss {
+  align-self: flex-end;
+  border: none;
+  background: none;
+  color: #a08427;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 #bubble-input {
   border: 1px solid #ccc;
   border-radius: 6px;

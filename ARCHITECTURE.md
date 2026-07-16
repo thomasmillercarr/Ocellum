@@ -122,6 +122,25 @@ Pattern (standard for Tauri overlays):
   tool list (§3); MCP (M5) feeds it.
 - Default provider anthropic / claude-opus-4-8; user-changeable in Settings.
 
+### M3 — the loop
+
+- `leads.rs` — capture (heuristic parse: hand-rolled email scan, company
+  from suffix words or domain stem, free-mail domains excluded), enrich
+  (run_chat + web_search=true, refused on Ollama), draft (run_chat, writes
+  interaction row + Windows clipboard via clipboard-manager plugin), local
+  reminders (2s scanner thread), dismissals.
+- **`surface(app, trigger_type, evidence, payload)` is the only door for
+  unsolicited UI.** It enforces hard_silence and the three-dismissals rule
+  and logs to SurfaceLog. New triggers (decay at M7, clipboard_lead) MUST go
+  through it. Reminders are solicited: they bypass the dismissal counter but
+  honour hard silence (deferred, not dropped — they stay pending).
+- Clipboard monitoring: opt-in (default 0), 2s poll, surfaces
+  "clipboard_lead" with the found email as evidence; frontend shows a red
+  dot on the pet while active.
+- Tray: Hard silence CheckMenuItem ↔ `hard_silence` setting.
+- Events to frontend: enrich-done, draft-done, loop-error, surface,
+  monitor-state.
+
 ## Trade log
 
 - (record capable-vs-light trades here)

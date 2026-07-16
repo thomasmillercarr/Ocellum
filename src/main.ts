@@ -53,7 +53,7 @@ bubbleInput.addEventListener("input", () => {
 // ---------------------------------------------------------------------------
 
 const chatLog = document.getElementById("chat-log") as HTMLDivElement;
-const views = ["chat", "budget", "egress", "settings"] as const;
+const views = ["chat", "leads", "budget", "egress", "settings"] as const;
 type View = (typeof views)[number];
 
 function showView(view: View) {
@@ -63,6 +63,7 @@ function showView(view: View) {
   document
     .querySelectorAll<HTMLButtonElement>("#bubble-tabs button")
     .forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+  if (view === "leads") void renderLeads();
   if (view === "budget") void renderBudget();
   if (view === "egress") void renderEgress();
   if (view === "settings") void loadSettings();
@@ -122,6 +123,121 @@ void listen<{ message: string }>("chat-error", (e) => {
   streamingMsg?.remove();
   streamingMsg = null;
   addMsg("error", e.payload.message);
+});
+
+// --- Leads: the core loop (capture → enrich → draft → remind) ---
+
+interface LeadSummary {
+  id: number;
+  name: string | null;
+  company: string | null;
+  email: string | null;
+  enriched: boolean;
+  drafts: number;
+  next_reminder: string | null;
+}
+
+async function renderLeads() {
+  const list = document.getElementById("lead-list")!;
+  const leads = await invoke<LeadSummary[]>("list_leads");
+  list.innerHTML = "";
+  if (leads.length === 0) {
+    list.innerHTML = `<div class="hint">No leads yet. Paste something with an email address above.</div>`;
+    return;
+  }
+  for (const lead of leads) {
+    const div = document.createElement("div");
+    div.className = "lead";
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = lead.name ?? lead.email ?? `Lead #${lead.id}`;
+    const sub = document.createElement("div");
+    sub.className = "sub";
+    sub.textContent = [
+      lead.company,
+      lead.email,
+      lead.enriched ? "enriched" : "not enriched",
+      lead.drafts > 0 ? `${lead.drafts} draft(s)` : null,
+      lead.next_reminder ? `reminder ${lead.next_reminder.slice(0, 10)}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const mkBtn = (label: string, fn: () => void) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.addEventListener("click", () => {
+        b.disabled = true;
+        fn();
+      });
+      actions.appendChild(b);
+      return b;
+    };
+    mkBtn("Enrich", () => void invoke("enrich_lead", { leadId: lead.id }));
+    mkBtn("Draft email", () => void invoke("draft_lead_email", { leadId: lead.id }));
+    mkBtn("Remind in 3d", async () => {
+      await invoke("remind_lead", { leadId: lead.id, days: 3, note: "Follow up" });
+      void renderLeads();
+    });
+    div.append(who, sub, actions);
+    list.appendChild(div);
+  }
+}
+
+document.getElementById("capture-btn")!.addEventListener("click", async () => {
+  const box = document.getElementById("capture-text") as HTMLTextAreaElement;
+  if (!box.value.trim()) return;
+  await invoke("capture_lead", { text: box.value });
+  box.value = "";
+  void renderLeads();
+});
+
+function notice(text: string, dismiss?: { triggerType: string; hash: string }) {
+  const div = document.createElement("div");
+  div.className = "notice";
+  div.textContent = text;
+  if (dismiss) {
+    const btn = document.createElement("button");
+    btn.className = "dismiss";
+    btn.textContent = "Dismiss (3 dismissals turn this off for good)";
+    btn.addEventListener("click", () => {
+      void invoke("dismiss_surface", {
+        triggerType: dismiss.triggerType,
+        contextHash: dismiss.hash,
+      });
+      div.remove();
+    });
+    div.appendChild(btn);
+  }
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+void listen<{ lead_id: number; notes: string }>("enrich-done", (e) => {
+  notice(`Lead #${e.payload.lead_id} enriched.`);
+  void renderLeads();
+});
+
+void listen<{ lead_id: number; text: string }>("draft-done", (e) => {
+  notice(`Draft for lead #${e.payload.lead_id} is on your clipboard — paste it into your mail client.`);
+  void renderLeads();
+});
+
+void listen<{ lead_id: number; message: string }>("loop-error", (e) => {
+  addMsg("error", e.payload.message);
+  void renderLeads();
+});
+
+void listen<{ trigger_type: string; evidence: string; payload: unknown }>("surface", (e) => {
+  notice(e.payload.evidence, {
+    triggerType: e.payload.trigger_type,
+    hash: String((e.payload.payload as { reminder_id?: number })?.reminder_id ?? ""),
+  });
+});
+
+void listen<{ active: boolean }>("monitor-state", (e) => {
+  document.getElementById("monitor-dot")!.hidden = !e.payload.active;
 });
 
 // --- Budget ---
@@ -185,6 +301,7 @@ async function loadSettings() {
   $<HTMLInputElement>("set-ollama-model").value = s.ollama_model as string;
   $<HTMLInputElement>("set-ollama-url").value = s.ollama_url as string;
   $<HTMLInputElement>("set-cap-enabled").checked = s.cap_enabled === "1";
+  $<HTMLInputElement>("set-clipboard-monitor").checked = s.clipboard_monitor === "1";
   $<HTMLInputElement>("set-cap-pounds").value = (
     parseFloat(s.cap_pence as string) / 100
   ).toString();
@@ -235,6 +352,9 @@ $<HTMLInputElement>("set-ollama-url").addEventListener("change", (e) =>
 );
 $<HTMLInputElement>("set-cap-enabled").addEventListener("change", (e) =>
   void saveSetting("cap_enabled", (e.target as HTMLInputElement).checked ? "1" : "0"),
+);
+$<HTMLInputElement>("set-clipboard-monitor").addEventListener("change", (e) =>
+  void saveSetting("clipboard_monitor", (e.target as HTMLInputElement).checked ? "1" : "0"),
 );
 $<HTMLInputElement>("set-cap-pounds").addEventListener("change", (e) => {
   const pounds = parseFloat((e.target as HTMLInputElement).value) || 0;

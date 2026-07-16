@@ -1,5 +1,6 @@
 mod chat;
 mod db;
+mod leads;
 mod prompt;
 mod providers;
 
@@ -231,6 +232,18 @@ fn spawn_test_control(app: AppHandle) {
                     let last = chat_state.last_response.lock().unwrap().clone();
                     serde_json::json!({ "last": last })
                 }
+                "egress-hosts" => {
+                    let dbs = app.state::<chat::DbState>();
+                    let conn = dbs.0.lock().unwrap();
+                    let hosts: Vec<String> = conn
+                        .prepare("SELECT DISTINCT destination FROM egress_log")
+                        .and_then(|mut s| {
+                            s.query_map([], |r| r.get(0))
+                                .map(|rows| rows.filter_map(Result::ok).collect())
+                        })
+                        .unwrap_or_default();
+                    serde_json::json!({ "hosts": hosts })
+                }
                 "egress-count" => {
                     let dbs = app.state::<chat::DbState>();
                     let n = db::egress_count(&dbs.0.lock().unwrap());
@@ -248,6 +261,102 @@ fn spawn_test_control(app: AppHandle) {
                             }
                         }
                         None => serde_json::json!({ "error": "usage: set-setting <key> <value>" }),
+                    }
+                }
+                cmd if cmd.starts_with("get-setting ") => {
+                    let key = cmd["get-setting ".len()..].trim();
+                    let dbs = app.state::<chat::DbState>();
+                    let conn = dbs.0.lock().unwrap();
+                    serde_json::json!({ "value": chat::setting_or_default(&conn, key) })
+                }
+                cmd if cmd.starts_with("capture ") => {
+                    let text = cmd["capture ".len()..].replace("\\n", "\n");
+                    let dbs = app.state::<chat::DbState>();
+                    let conn = dbs.0.lock().unwrap();
+                    match leads::insert_lead(&conn, &text, "test") {
+                        Ok(id) => serde_json::json!({ "id": id }),
+                        Err(e) => serde_json::json!({ "error": e.to_string() }),
+                    }
+                }
+                cmd if cmd.starts_with("enrich ") => {
+                    match cmd["enrich ".len()..].trim().parse::<i64>() {
+                        Ok(id) => match leads::enrich(&app, id) {
+                            Ok(notes) => serde_json::json!({ "notes": notes }),
+                            Err(e) => serde_json::json!({ "error": e }),
+                        },
+                        Err(_) => serde_json::json!({ "error": "bad id" }),
+                    }
+                }
+                cmd if cmd.starts_with("draft ") => {
+                    match cmd["draft ".len()..].trim().parse::<i64>() {
+                        Ok(id) => match leads::draft(&app, id) {
+                            Ok(text) => serde_json::json!({ "text": text }),
+                            Err(e) => serde_json::json!({ "error": e }),
+                        },
+                        Err(_) => serde_json::json!({ "error": "bad id" }),
+                    }
+                }
+                cmd if cmd.starts_with("remind ") => {
+                    let parts: Vec<&str> = cmd["remind ".len()..].split_whitespace().collect();
+                    match (parts.first().and_then(|s| s.parse::<i64>().ok()),
+                           parts.get(1).and_then(|s| s.parse::<i64>().ok())) {
+                        (Some(id), Some(secs)) => {
+                            let due = (chrono::Utc::now() + chrono::Duration::seconds(secs)).to_rfc3339();
+                            let dbs = app.state::<chat::DbState>();
+                            let conn = dbs.0.lock().unwrap();
+                            match leads::schedule_reminder(&conn, id, &due, "gate") {
+                                Ok(rid) => serde_json::json!({ "reminder_id": rid }),
+                                Err(e) => serde_json::json!({ "error": e.to_string() }),
+                            }
+                        }
+                        _ => serde_json::json!({ "error": "usage: remind <lead_id> <secs>" }),
+                    }
+                }
+                cmd if cmd.starts_with("reminder-state ") => {
+                    let id: i64 = cmd["reminder-state ".len()..].trim().parse().unwrap_or(0);
+                    let dbs = app.state::<chat::DbState>();
+                    let conn = dbs.0.lock().unwrap();
+                    let state: Result<String, _> = conn.query_row(
+                        "SELECT state FROM reminder WHERE id = ?1",
+                        [id],
+                        |r| r.get(0),
+                    );
+                    match state {
+                        Ok(s) => serde_json::json!({ "state": s }),
+                        Err(e) => serde_json::json!({ "error": e.to_string() }),
+                    }
+                }
+                "lead-rows" => {
+                    let dbs = app.state::<chat::DbState>();
+                    let conn = dbs.0.lock().unwrap();
+                    let leads: i64 = conn.query_row("SELECT COUNT(*) FROM lead", [], |r| r.get(0)).unwrap_or(0);
+                    let enrichments: i64 = conn.query_row("SELECT COUNT(*) FROM enrichment", [], |r| r.get(0)).unwrap_or(0);
+                    let drafts: i64 = conn.query_row(
+                        "SELECT COUNT(*) FROM interaction WHERE kind = 'draft_email'", [], |r| r.get(0)).unwrap_or(0);
+                    serde_json::json!({ "leads": leads, "enrichments": enrichments, "drafts": drafts })
+                }
+                "surfaces" => {
+                    let log = app.state::<leads::SurfaceLog>();
+                    let map = log.0.lock().unwrap().clone();
+                    serde_json::json!({ "surfaces": map })
+                }
+                cmd if cmd.starts_with("fire-surface ") => {
+                    let t = cmd["fire-surface ".len()..].trim().to_string();
+                    let shown = leads::surface(
+                        &app,
+                        &t,
+                        "gate-test evidence: synthetic trigger",
+                        serde_json::json!({}),
+                    );
+                    serde_json::json!({ "shown": shown })
+                }
+                cmd if cmd.starts_with("dismiss ") => {
+                    let t = cmd["dismiss ".len()..].trim();
+                    let dbs = app.state::<chat::DbState>();
+                    let conn = dbs.0.lock().unwrap();
+                    match leads::record_dismissal(&conn, t, "gate") {
+                        Ok(()) => serde_json::json!({ "ok": true }),
+                        Err(e) => serde_json::json!({ "error": e.to_string() }),
                     }
                 }
                 cmd if cmd.starts_with("delete-key ") => {
@@ -293,8 +402,10 @@ fn position_bottom_right(window: &WebviewWindow) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState(Mutex::new(Shared::default())))
         .manage(chat::ChatState::default())
+        .manage(leads::SurfaceLog::default())
         .invoke_handler(tauri::generate_handler![
             set_hit_regions,
             report_input,
@@ -306,7 +417,13 @@ pub fn run() {
             chat::delete_api_key,
             chat::get_budget,
             chat::get_egress_log,
-            chat::chat_send
+            chat::chat_send,
+            leads::capture_lead,
+            leads::list_leads,
+            leads::enrich_lead,
+            leads::draft_lead_email,
+            leads::remind_lead,
+            leads::dismiss_surface
         ])
         .setup(|app| {
             // Local store: OCELLUM_DB_PATH overrides for tests.
@@ -343,16 +460,36 @@ pub fn run() {
 
             let quit = MenuItem::with_id(app, "quit", "Quit Ocellum", true, None::<&str>)?;
             let summon = MenuItem::with_id(app, "summon", "Summon", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&summon, &quit])?;
+            let silence_on = {
+                let dbs = app.state::<chat::DbState>();
+                let conn = dbs.0.lock().unwrap();
+                chat::setting_or_default(&conn, "hard_silence") == "1"
+            };
+            let silence = tauri::menu::CheckMenuItem::with_id(
+                app,
+                "silence",
+                "Hard silence",
+                true,
+                silence_on,
+                None::<&str>,
+            )?;
+            let menu = Menu::with_items(app, &[&summon, &silence, &quit])?;
             TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().expect("bundled icon").clone())
                 .tooltip("Ocellum")
                 .menu(&menu)
                 .show_menu_on_left_click(true)
-                .on_menu_event(|app, event| match event.id.as_ref() {
+                .on_menu_event(move |app, event| match event.id.as_ref() {
                     "quit" => app.exit(0),
                     "summon" => {
                         let _ = app.emit("toggle-bubble", ());
+                    }
+                    "silence" => {
+                        let dbs = app.state::<chat::DbState>();
+                        let conn = dbs.0.lock().unwrap();
+                        let now = chat::setting_or_default(&conn, "hard_silence") == "1";
+                        let _ = db::setting_set(&conn, "hard_silence", if now { "0" } else { "1" });
+                        let _ = silence.set_checked(!now);
                     }
                     _ => {}
                 })
@@ -371,6 +508,8 @@ pub fn run() {
             )?;
 
             spawn_cursor_poll(app.handle().clone());
+            leads::spawn_reminder_scanner(app.handle().clone());
+            leads::spawn_clipboard_monitor(app.handle().clone());
             if std::env::var("OCELLUM_TEST").as_deref() == Ok("1") {
                 spawn_test_control(app.handle().clone());
             }

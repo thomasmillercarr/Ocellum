@@ -12,6 +12,7 @@
         <div id="bubble-head">
           <nav id="bubble-tabs">
             <button data-view="chat" class="active">Chat</button>
+            <button data-view="leads">Leads</button>
             <button data-view="budget">Budget</button>
             <button data-view="egress">Egress</button>
             <button data-view="settings">Settings</button>
@@ -21,6 +22,11 @@
         <div id="view-chat" class="view">
           <div id="chat-log"></div>
           <input id="bubble-input" type="text" placeholder="Talk to Ocellum…" autocomplete="off" />
+        </div>
+        <div id="view-leads" class="view" hidden>
+          <textarea id="capture-text" rows="3" placeholder="Paste lead text — a signature, a bio, anything with an email…"></textarea>
+          <button id="capture-btn" class="action">Capture lead</button>
+          <div id="lead-list"></div>
         </div>
         <div id="view-budget" class="view" hidden></div>
         <div id="view-egress" class="view" hidden></div>
@@ -55,12 +61,14 @@
             <label>Ollama URL <input id="set-ollama-url" /></label>
             <div class="hint">No web search on Ollama — enrichment is unavailable.</div>
           </div>
+          <label class="row"><input type="checkbox" id="set-clipboard-monitor" /> Clipboard monitoring
+            <span class="hint">(off by default; a dot on the pet shows when active)</span></label>
           <label class="row"><input type="checkbox" id="set-cap-enabled" /> Monthly spend cap</label>
           <label>Cap (£) <input id="set-cap-pounds" type="number" min="0" step="0.5" /></label>
           <div id="settings-status" class="hint"></div>
         </div>
       </div>
-      <div id="pet" title="Ocellum"><canvas id="pet-canvas"></canvas></div>
+      <div id="pet" title="Ocellum"><canvas id="pet-canvas"></canvas><div id="monitor-dot" hidden title="Clipboard monitoring is active"></div></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
