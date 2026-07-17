@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Desktop companion for individual salespeople"
 edition = "2021"
 license = "AGPL-3.0-only"
+default-run = "ocellum"  # mock_llm is a gate-test helper; ocellum is the app
 
 [lib]
 name = "ocellum_lib"
