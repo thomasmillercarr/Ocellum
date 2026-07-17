@@ -141,6 +141,24 @@ Pattern (standard for Tauri overlays):
 - Events to frontend: enrich-done, draft-done, loop-error, surface,
   monitor-state.
 
+### M4 — mood
+
+- `src-tauri/src/mood.rs` — `derive_mood(conn) -> Mood` is a pure read over
+  `lead`/`interaction`, computed on every request, never stored (§8.4):
+  bright = draft in the last day; flat = ≥14 days since anything happened;
+  restless = a lead with exactly one draft and no later touch, ≥5 days old
+  (§7's decay framing); neutral otherwise — including an empty DB (a fresh
+  install has nothing to be flat about). `record_mood_delta` appends to the
+  `mood_event` journal (never read back into `derive_mood`); the only hook is
+  draft creation in `leads.rs`. Frontend reads via `get_mood` command; test
+  control channel exposes `mood`.
+- `src/mood.ts` — mood → brow layer (`MOOD_BROWS`) passed as `extraLayers`
+  to the existing renderer (absent layers degrade per §8.2, so no-brows
+  characters need no special casing), and mood → roll speed via
+  `moodRollRate`: main.ts advances a *virtual* roll clock by dt·rate so a
+  mood change bends speed without a phase snap. Blink stays on wall time —
+  roll/blink clock independence holds.
+
 ## Trade log
 
 - (record capable-vs-light trades here)

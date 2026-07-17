@@ -70,20 +70,34 @@ try {
         $null = Send-Control "set-setting anthropic_url http://127.0.0.1:47700"
         $null = Send-Control "set-setting anthropic_model claude-opus-4-8"
 
+        # Fixed sleeps flake under load (builds, OneDrive sync) — poll for the
+        # expected state instead; assertions are unchanged.
         $null = Send-Control "open-bubble"
         Start-Sleep -Milliseconds 800
         (New-Object -ComObject WScript.Shell).SendKeys("ping{ENTER}")
-        Start-Sleep -Seconds 2
-        $last = (Send-Control "chat-log").last
+        $last = ""
+        foreach ($i in 1..50) {
+            Start-Sleep -Milliseconds 200
+            $last = (Send-Control "chat-log").last
+            if ($last -eq "Hello from the mock") { break }
+        }
         Check "streaming conversation through live bubble ('$last')" ($last -eq "Hello from the mock")
 
         $egress = (Send-Control "egress-count").count
         Check "egress row per model call (1 call = $egress row)" ($egress -eq 1)
 
-        # Second call -> second row (count parity, not a lucky constant)
+        # Second call -> second row (count parity, not a lucky constant).
+        # Re-assert focus first: anything grabbing foreground between the two
+        # messages would send the keystrokes elsewhere.
+        $null = Send-Control "open-bubble"
+        Start-Sleep -Milliseconds 400
         (New-Object -ComObject WScript.Shell).SendKeys("again{ENTER}")
-        Start-Sleep -Seconds 2
-        $egress2 = (Send-Control "egress-count").count
+        $egress2 = 0
+        foreach ($i in 1..50) {
+            Start-Sleep -Milliseconds 200
+            $egress2 = (Send-Control "egress-count").count
+            if ($egress2 -ge 2) { break }
+        }
         Check "egress parity holds across calls (2 calls = $egress2 rows)" ($egress2 -eq 2)
 
         # --- No key material on disk ---

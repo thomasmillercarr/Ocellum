@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { placeholderCharacter } from "./character";
 import { BlinkMachine, rollTransform } from "./behaviour";
 import { renderFrame } from "./renderer";
+import { MOOD_BROWS, moodRollRate, type Mood } from "./mood";
 
 const pet = document.getElementById("pet") as HTMLDivElement;
 const bubble = document.getElementById("bubble") as HTMLDivElement;
@@ -222,6 +223,7 @@ void listen<{ lead_id: number; notes: string }>("enrich-done", (e) => {
 void listen<{ lead_id: number; text: string }>("draft-done", (e) => {
   notice(`Draft for lead #${e.payload.lead_id} is on your clipboard — paste it into your mail client.`);
   void renderLeads();
+  void refreshMood();
 });
 
 void listen<{ lead_id: number; message: string }>("loop-error", (e) => {
@@ -380,6 +382,18 @@ window.addEventListener("resize", () => void reportHitRegions());
 
 void reportHitRegions();
 
+// Mood is derived Rust-side from local data (§8.4); we only ever read it.
+let mood: Mood = "neutral";
+async function refreshMood() {
+  try {
+    mood = (await invoke<string>("get_mood")) as Mood;
+  } catch {
+    /* pre-DB or shutdown: keep the last mood */
+  }
+}
+void refreshMood();
+setInterval(() => void refreshMood(), 60_000);
+
 async function startCharacter() {
   const character = await placeholderCharacter();
   const canvas = document.getElementById("pet-canvas") as HTMLCanvasElement;
@@ -392,9 +406,15 @@ async function startCharacter() {
   // a real character ever needs a different pivot.
   const radius = character.width * 0.375;
   const t0 = performance.now();
+  // Roll runs on a mood-rate virtual clock (see moodRollRate); blink stays on
+  // wall time — the two must never share a clock (§8.3).
+  let rollT = 0;
+  let prev = t0;
   const frame = (now: number) => {
     const t = now - t0;
-    renderFrame(ctx, character, blink.at(t), rollTransform(t, radius));
+    rollT += (now - prev) * moodRollRate(mood);
+    prev = now;
+    renderFrame(ctx, character, blink.at(t), rollTransform(rollT, radius), [MOOD_BROWS[mood]]);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

@@ -1,6 +1,7 @@
 mod chat;
 mod db;
 mod leads;
+mod mood;
 mod prompt;
 mod providers;
 
@@ -335,6 +336,17 @@ fn spawn_test_control(app: AppHandle) {
                         "SELECT COUNT(*) FROM interaction WHERE kind = 'draft_email'", [], |r| r.get(0)).unwrap_or(0);
                     serde_json::json!({ "leads": leads, "enrichments": enrichments, "drafts": drafts })
                 }
+                "mood" => {
+                    let dbs = app.state::<chat::DbState>();
+                    let conn = dbs.0.lock().unwrap();
+                    let events: i64 = conn
+                        .query_row("SELECT COUNT(*) FROM mood_event", [], |r| r.get(0))
+                        .unwrap_or(0);
+                    serde_json::json!({
+                        "mood": mood::derive_mood(&conn).as_str(),
+                        "events": events,
+                    })
+                }
                 "surfaces" => {
                     let log = app.state::<leads::SurfaceLog>();
                     let map = log.0.lock().unwrap().clone();
@@ -423,7 +435,8 @@ pub fn run() {
             leads::enrich_lead,
             leads::draft_lead_email,
             leads::remind_lead,
-            leads::dismiss_surface
+            leads::dismiss_surface,
+            mood::get_mood
         ])
         .setup(|app| {
             // Local store: OCELLUM_DB_PATH overrides for tests.

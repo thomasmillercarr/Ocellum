@@ -8,6 +8,7 @@
 | M1 — Signs of life | **PASSED** 2026-07-16 | `scripts/gate-m1.ps1` exit 0 — 21 TS + 2 Rust tests, live render check |
 | M2 — A brain | **PASSED** 2026-07-16 | `scripts/gate-m2.ps1` exit 0 — 13 unit + 2 real-integration tests + live-UI E2E |
 | M3 — The loop | **PASSED** 2026-07-16 | `scripts/gate-m3.ps1` exit 0 — full loop E2E, 8.6s cold start → draft |
+| M4 — Mood | **PASSED** 2026-07-17 | `scripts/gate-m4.ps1` exit 0 — 6 Rust + 3 TS tests, derived-only greps, live E2E |
 
 ## Log
 
@@ -29,6 +30,26 @@
       modes, or check manually. ScaleFactorChanged handler repositions the
       window on DPI/display changes.
 - [ ] M3: cold start → first draft timing (record here)
+
+## M4 gate result (2026-07-17)
+
+- Unit (Rust): seeded DB with 15 days of silence → `flat`; fresh draft →
+  `bright` + positive `mood_event` delta; one draft with no second touch,
+  6 days old → `restless`; a later touch clears it; empty DB → `neutral`
+  (fresh install is not "flat").
+- Unit (TS): each mood maps to a distinct brow layer; mood modulates the roll
+  period (restless/bright faster, flat slower) via a rate-scaled virtual
+  clock — blink untouched; a no-brows character (the placeholder) renders
+  without error under every mood and the modulation still applies.
+- Static: `mood` appears in the schema only as the `mood_event` journal; no
+  set-mood command exists in Rust or TS; `mood.rs` contains no UPDATE/DELETE.
+- Live E2E (release exe, mock provider): fresh DB reports `neutral` with 0
+  events; a real draft through the app flips mood to `bright` and writes a
+  `mood_event` row.
+- Regression: gates m0–m3 re-run and pass. Two flaky checks in gate-m2's live
+  section (fixed 2s sleeps racing the second SendKeys exchange under load)
+  were converted to condition polls + a focus re-assert; assertions unchanged.
+  Verified against the app directly: 2 calls → 2 egress rows.
 
 ## M3 gate result (2026-07-16)
 

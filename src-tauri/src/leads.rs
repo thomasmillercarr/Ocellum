@@ -313,6 +313,7 @@ pub fn draft(app: &AppHandle, lead_id: i64) -> Result<String, String> {
             ],
         )
         .map_err(|e| e.to_string())?;
+        let _ = crate::mood::record_mood_delta(&conn, 1.0, "draft_created");
     }
     // Draft goes to the clipboard. The user sends from their own client (§2).
     app.clipboard()
