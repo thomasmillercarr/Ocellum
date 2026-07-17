@@ -42,6 +42,32 @@ capture (clipboard / paste / hotkey)
 
 Keys are stored in the Windows Credential Manager, never on disk.
 
+## Custom characters
+
+The desktop character is an **asset contract, not code** — the pet is just a
+folder of PNGs, so you can fully replace it with your own. A character lives in
+`public/chameleon/` as `character.json` plus layers, all exported on an
+**identical square canvas** registered to a common origin (compositing is a
+plain layer stack, no offsets):
+
+- **Required:** `body`, `eyes_open`, `eyes_half`, `eyes_closed`
+- **Optional:** `shadow`, `mouth_closed`, `mouth_open`, `brows_neutral`,
+  `brows_happy`, `brows_restless`, `brows_flat`
+
+Missing layers degrade gracefully (no brows just means no facial mood — mood
+still drives behaviour); mismatched dimensions are rejected at load with a clear
+error. See [OCELLUM-BRIEF.md](OCELLUM-BRIEF.md) §8.2 for the full contract.
+
+Two ways to make one:
+
+1. **Draw the layers directly** — any tool, matching the layer names on one
+   shared canvas size.
+2. **Slice a pose sheet** — draw a single 2×2 sheet (eyes open / half / closed
+   on a solid magenta background) and run
+   `python scripts/slice-character.py sheet.png public/chameleon --name "My Character" --preview`.
+   The bundled Sales Chameleon was made this way; the script header documents
+   the exact layout.
+
 ## Status
 
 Pre-release, built milestone by milestone with a hard gate per milestone —

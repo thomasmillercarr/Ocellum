@@ -3,3 +3,6 @@ dist/
 src-tauri/target/
 src-tauri/gen/
 *.log
+
+# character slicer --preview artifact
+**/_registration_preview.png
