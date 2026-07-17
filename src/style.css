@@ -25,8 +25,8 @@ body {
   position: absolute;
   right: 24px;
   bottom: 24px;
-  width: 96px;
-  height: 96px;
+  width: 192px;
+  height: 192px;
   cursor: pointer;
 }
 
@@ -39,7 +39,7 @@ body {
 #bubble {
   position: absolute;
   right: 24px;
-  bottom: 136px;
+  bottom: 176px;
   width: 400px;
   height: 380px;
   background: #ffffff;

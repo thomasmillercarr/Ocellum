@@ -45,8 +45,10 @@ Keys are stored in the Windows Credential Manager, never on disk.
 ## Status
 
 Pre-release, built milestone by milestone with a hard gate per milestone —
-see [PROGRESS.md](PROGRESS.md) and [ROADMAP.md](ROADMAP.md). M0–M3 (shell,
-character, provider layer, the core loop) have passed their gates.
+see [PROGRESS.md](PROGRESS.md) and [ROADMAP.md](ROADMAP.md). M0–M4 (shell,
+character, provider layer, the core loop, mood) have passed their gates. It
+runs today with an animated character (the Sales Chameleon) and any of the
+providers below; M5–M7 (MCP host, voice, the four features) are next.
 
 ## Unsigned builds
 

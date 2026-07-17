@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { placeholderCharacter } from "./character";
+import {
+  placeholderCharacter,
+  characterFromBytes,
+  LAYER_NAMES,
+  type Character,
+  type LayerName,
+} from "./character";
 import { BlinkMachine, rollTransform } from "./behaviour";
 import { renderFrame } from "./renderer";
 import { MOOD_BROWS, moodRollRate, type Mood } from "./mood";
@@ -394,8 +400,50 @@ async function refreshMood() {
 void refreshMood();
 setInterval(() => void refreshMood(), 60_000);
 
+/** Decode PNG bytes via an <img> + object URL — the same path the placeholder
+ * uses successfully in this webview (more robust here than createImageBitmap). */
+function decodeViaImage(bytes: Uint8Array): Promise<CanvasImageSource> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "image/png" }));
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("image decode failed"));
+    };
+    img.src = url;
+  });
+}
+
+async function loadCharacter(): Promise<Character> {
+  const base = "/chameleon/";
+  try {
+    const manifestRes = await fetch(base + "character.json");
+    if (!manifestRes.ok) throw new Error(`character.json HTTP ${manifestRes.status}`);
+    const manifestJson = await manifestRes.text();
+    const layerBytes: Partial<Record<LayerName, Uint8Array>> = {};
+    await Promise.all(
+      LAYER_NAMES.map(async (name) => {
+        const res = await fetch(`${base}${name}.png`);
+        // The dev server (Vite) answers missing files with index.html at HTTP
+        // 200, so require an actual PNG content-type — never trust res.ok alone.
+        if (res.ok && res.headers.get("content-type")?.includes("image/png")) {
+          layerBytes[name] = new Uint8Array(await res.arrayBuffer());
+        }
+      }),
+    );
+    return await characterFromBytes(manifestJson, layerBytes, decodeViaImage);
+  } catch (e) {
+    console.warn("character load failed, using placeholder:", e);
+    return placeholderCharacter();
+  }
+}
+
 async function startCharacter() {
-  const character = await placeholderCharacter();
+  const character = await loadCharacter();
   const canvas = document.getElementById("pet-canvas") as HTMLCanvasElement;
   canvas.width = character.width;
   canvas.height = character.height;
